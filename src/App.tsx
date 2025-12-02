@@ -3,7 +3,7 @@ import {
   ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
 import { 
-  Wallet, TrendingUp, Landmark, History, Plus, Trash2, Save, Briefcase, BrainCircuit, X, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Tag, BadgePercent, LogOut, UserCircle
+  Wallet, TrendingUp, Landmark, History, Plus, Trash2, Save, Briefcase, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Tag, BadgePercent, LogOut, UserCircle
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -43,7 +43,6 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = "my-asset-tracker"; 
-const apiKey = ""; 
 
 // 圖表顏色設定
 const COLORS_CATEGORY = ['#3b82f6', '#10b981']; 
@@ -115,8 +114,6 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
   const [allocationView, setAllocationView] = useState<'category' | 'bank'>('category');
-  const [aiAnalysis, setAiAnalysis] = useState<string>("");
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [inputDate, setInputDate] = useState(new Date().toISOString().slice(0, 10));
   const [inputBankName, setInputBankName] = useState(''); 
   const [inputBank, setInputBank] = useState('');
@@ -341,51 +338,6 @@ export default function App() {
     }
   };
 
-  // AI 分析
-  const handleAiAnalysis = async () => {
-    if (aggregatedChartData.length < 2) {
-      showNotification('error', '請至少輸入兩筆紀錄');
-      return;
-    }
-    if (!apiKey) {
-      showNotification('error', '未設定 Gemini API Key');
-      setAiAnalysis("請在程式碼中填入您的 Google Gemini API Key 才能使用此功能。");
-      return;
-    }
-    setIsAnalyzing(true);
-    setAiAnalysis(""); 
-    try {
-      const dataSummary = aggregatedChartData.slice(-6).map(r => ({
-        date: r.name,
-        bank: r.銀行,
-        stock: r.股票,
-        total: r.總資產,
-      }));
-      const systemPrompt = `你是一位專業的個人理財顧問... (下略)`;
-      const userPrompt = `這是我的最近資產紀錄：${JSON.stringify(dataSummary)}`;
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: userPrompt }] }],
-            systemInstruction: { parts: [{ text: systemPrompt }] }
-          }),
-        }
-      );
-      if (!response.ok) throw new Error('AI API Error');
-      const result = await response.json();
-      const text = result.candidates?.[0]?.content?.parts?.[0]?.text || "無法產生分析結果。";
-      setAiAnalysis(text);
-    } catch (error) {
-      console.error("AI Analysis failed:", error);
-      showNotification('error', 'AI 分析失敗');
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
   if (loading) {
     return <div className="flex items-center justify-center h-screen bg-slate-50 text-slate-500">
       載入中...
@@ -498,15 +450,6 @@ export default function App() {
                 <LogOut className="w-3 h-3" />
               </button>
             </div>
-
-             <button
-              onClick={handleAiAnalysis}
-              disabled={isAnalyzing || aggregatedChartData.length === 0}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-xl shadow-sm border border-transparent flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed hidden md:flex"
-            >
-              {isAnalyzing ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <BrainCircuit className="w-5 h-5" />}
-              {isAnalyzing ? '分析中...' : 'AI 資產分析'}
-            </button>
             
             <div className="bg-white px-6 py-3 rounded-xl shadow-sm border border-slate-200 flex items-center gap-3 w-full sm:w-auto">
               <div className="p-2 bg-emerald-100 rounded-full">
@@ -518,24 +461,7 @@ export default function App() {
               </div>
             </div>
           </div>
-           {/* Mobile AI Button */}
-           <button
-              onClick={handleAiAnalysis}
-              disabled={isAnalyzing || aggregatedChartData.length === 0}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-xl shadow-sm border border-transparent flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed md:hidden w-full"
-            >
-              {isAnalyzing ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <BrainCircuit className="w-5 h-5" />}
-              {isAnalyzing ? '分析中...' : 'AI 資產分析'}
-            </button>
         </header>
-
-        {aiAnalysis && (
-          <div className="bg-gradient-to-r from-indigo-50 to-blue-50 p-6 rounded-xl border border-indigo-100 animate-fade-in relative">
-            <button onClick={() => setAiAnalysis("")} className="absolute top-4 right-4 text-indigo-300 hover:text-indigo-600 transition-colors"><X className="w-5 h-5" /></button>
-            <h3 className="text-lg font-bold text-indigo-900 mb-3 flex items-center gap-2"><BrainCircuit className="w-5 h-5 text-indigo-600" /> AI 理財顧問分析</h3>
-            <div className="text-indigo-800 leading-relaxed whitespace-pre-line text-sm md:text-base">{aiAnalysis}</div>
-          </div>
-        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="space-y-6">
