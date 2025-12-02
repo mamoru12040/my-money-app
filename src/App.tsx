@@ -3,10 +3,9 @@ import {
   ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
 import { 
-  Wallet, TrendingUp, Landmark, History, Plus, Trash2, Save, Briefcase, BrainCircuit, X, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Tag, BadgePercent, LogOut, LogIn
+  Wallet, TrendingUp, Landmark, History, Plus, Trash2, Save, Briefcase, BrainCircuit, X, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Tag, BadgePercent, LogOut, UserCircle
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
-// ★★★ 修改處：引入 Google 登入相關功能 ★★★
 import { 
   getAuth, 
   onAuthStateChanged, 
@@ -125,11 +124,10 @@ export default function App() {
   const [inputNote, setInputNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // ★★★ 修改：監聽登入狀態 ★★★
+  // 監聽登入狀態
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
-      // 如果沒有使用者，就結束載入狀態（顯示登入畫面）
       if (!currentUser) {
         setLoading(false);
       }
@@ -137,7 +135,7 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // ★★★ 新增：Google 登入功能 ★★★
+  // Google 登入功能
   const handleGoogleLogin = async () => {
     const provider = new GoogleAuthProvider();
     try {
@@ -149,11 +147,11 @@ export default function App() {
     }
   };
 
-  // ★★★ 新增：登出功能 ★★★
+  // 登出功能
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      setRecords([]); // 清空畫面上的資料
+      setRecords([]); 
       showNotification('success', '已登出');
     } catch (error) {
       console.error("Logout failed:", error);
@@ -163,7 +161,7 @@ export default function App() {
   // 讀取資料
   useEffect(() => {
     if (!user) return;
-    setLoading(true); // 開始讀取
+    setLoading(true);
     const recordsRef = collection(db, 'artifacts', appId, 'users', user.uid, 'asset_records');
     const q = query(recordsRef);
 
@@ -388,7 +386,6 @@ export default function App() {
     }
   };
 
-  // ★★★ 如果還在載入，顯示載入畫面 ★★★
   if (loading) {
     return <div className="flex items-center justify-center h-screen bg-slate-50 text-slate-500">
       載入中...
@@ -466,23 +463,39 @@ export default function App() {
           </div>
           <div className="flex flex-col sm:flex-row gap-3 items-center">
             {/* 顯示使用者資訊與登出按鈕 */}
-            <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200 mr-auto sm:mr-0 w-full sm:w-auto justify-between sm:justify-start">
+            <div className={`flex items-center gap-3 px-4 py-2 rounded-xl shadow-sm border mr-auto sm:mr-0 w-full sm:w-auto justify-between sm:justify-start ${
+              user.isAnonymous ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'
+            }`}>
               <div className="flex items-center gap-2">
-                {user.photoURL ? (
+                {user.isAnonymous ? (
+                  <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
+                    <UserCircle className="w-5 h-5" />
+                  </div>
+                ) : user.photoURL ? (
                   <img src={user.photoURL} alt="User" className="w-8 h-8 rounded-full" />
                 ) : (
                   <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
                     {user.email?.[0]?.toUpperCase() || 'U'}
                   </div>
                 )}
-                <span className="text-sm font-medium text-slate-700 max-w-[100px] truncate">{user.displayName || user.email}</span>
+                
+                <div className="flex flex-col">
+                   <span className="text-sm font-medium text-slate-700 max-w-[120px] truncate">
+                     {user.isAnonymous ? '目前是訪客' : (user.displayName || user.email)}
+                   </span>
+                   {user.isAnonymous && <span className="text-[10px] text-orange-600 font-bold">資料僅存本機 (未同步)</span>}
+                </div>
               </div>
               <button 
                 onClick={handleLogout}
-                className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-red-500 transition-colors"
-                title="登出"
+                className={`flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${
+                  user.isAnonymous 
+                  ? 'bg-orange-500 text-white hover:bg-orange-600' 
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-red-600'
+                }`}
               >
-                <LogOut className="w-5 h-5" />
+                {user.isAnonymous ? '切換帳號' : '登出'}
+                <LogOut className="w-3 h-3" />
               </button>
             </div>
 
@@ -650,47 +663,4 @@ export default function App() {
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full">
-              <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><History className="w-5 h-5 text-slate-400" />歷史紀錄</h3>
-                <span className="text-sm text-slate-400">共 {sortedRecordsForTable.length} 筆資料</span>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm whitespace-nowrap">
-                  <thead className="bg-slate-50 text-slate-500 uppercase font-semibold">
-                    <tr><th className="px-6 py-4">日期</th><th className="px-6 py-4">銀行名稱</th><th className="px-6 py-4 text-right">存款</th><th className="px-6 py-4 text-right">股票</th><th className="px-6 py-4 text-right text-emerald-700">資產</th><th className="px-6 py-4">備註</th><th className="px-6 py-4 text-right">刪除</th></tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {currentTableData.map((record) => (
-                      <tr key={record.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-6 py-4 font-medium text-slate-900">{formatDateWithDay(record.date)}</td>
-                        <td className="px-6 py-4 text-slate-600">{record.bankName || '-'}</td>
-                        <td className="px-6 py-4 text-right text-slate-600">{formatNumber(record.bank)}</td>
-                        <td className="px-6 py-4 text-right text-slate-600">{formatNumber(record.stock)}</td>
-                        <td className="px-6 py-4 text-right font-bold text-emerald-600">{formatNumber(record.bank + record.stock)}</td>
-                        <td className="px-6 py-4 text-slate-500 max-w-xs truncate">{record.note || '-'}</td>
-                        <td className="px-6 py-4 text-right">
-                          <button onClick={() => setDeletingId(record.id)} className="text-slate-400 hover:text-red-500 transition-colors p-1" title="刪除"><Trash2 className="w-4 h-4" /></button>
-                        </td>
-                      </tr>
-                    ))}
-                    {sortedRecordsForTable.length === 0 && (<tr><td colSpan={7} className="px-6 py-8 text-center text-slate-400">目前還沒有紀錄，請從左側新增第一筆資產數據。</td></tr>)}
-                  </tbody>
-                </table>
-              </div>
-              {totalPages > 1 && (
-                <div className="p-4 border-t border-slate-100 flex items-center justify-center gap-2">
-                  <button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} className="p-2 rounded-lg hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent"><ChevronLeft className="w-5 h-5 text-slate-600" /></button>
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                    <button key={page} onClick={() => setCurrentPage(page)} className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${currentPage === page ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{page}</button>
-                  ))}
-                  <button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages} className="p-2 rounded-lg hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent"><ChevronRight className="w-5 h-5 text-slate-600" /></button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+            <div className="bg-white rounded-xl shadow
