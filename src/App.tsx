@@ -3,14 +3,16 @@ import {
   ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
 import { 
-  Wallet, TrendingUp, Landmark, History, Plus, Trash2, Save, Briefcase, BrainCircuit, X, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Tag, BadgePercent
+  Wallet, TrendingUp, Landmark, History, Plus, Trash2, Save, Briefcase, BrainCircuit, X, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Tag, BadgePercent, LogOut, LogIn
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
-// ★★★ 修改處：User 前面加上 type ★★★
+// ★★★ 修改處：引入 Google 登入相關功能 ★★★
 import { 
   getAuth, 
   onAuthStateChanged, 
-  signInAnonymously, 
+  GoogleAuthProvider,
+  signInWithPopup,
+  signOut,
   type User 
 } from 'firebase/auth';
 import { 
@@ -42,7 +44,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = "my-asset-tracker"; 
-const apiKey = ""; // 如果有 Gemini API Key 再填，沒有就留空
+const apiKey = ""; 
 
 // 圖表顏色設定
 const COLORS_CATEGORY = ['#3b82f6', '#10b981']; 
@@ -123,33 +125,45 @@ export default function App() {
   const [inputNote, setInputNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 自動登入
+  // ★★★ 修改：監聽登入狀態 ★★★
   useEffect(() => {
-    const attemptSignIn = async (retries = 3, delay = 1000) => {
-      try {
-        await signInAnonymously(auth);
-      } catch (error: any) {
-        if (retries > 0) {
-          console.warn(`Auth failed, retrying in ${delay}ms...`, error);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          return attemptSignIn(retries - 1, delay * 2);
-        } else {
-          console.error("All auth attempts failed:", error);
-          setLoading(false);
-        }
-      }
-    };
-    attemptSignIn();
-
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
+      // 如果沒有使用者，就結束載入狀態（顯示登入畫面）
+      if (!currentUser) {
+        setLoading(false);
+      }
     });
     return () => unsubscribe();
   }, []);
 
+  // ★★★ 新增：Google 登入功能 ★★★
+  const handleGoogleLogin = async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+      showNotification('success', '登入成功！');
+    } catch (error) {
+      console.error("Login failed:", error);
+      showNotification('error', '登入失敗，請稍後再試');
+    }
+  };
+
+  // ★★★ 新增：登出功能 ★★★
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setRecords([]); // 清空畫面上的資料
+      showNotification('success', '已登出');
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
+
   // 讀取資料
   useEffect(() => {
     if (!user) return;
+    setLoading(true); // 開始讀取
     const recordsRef = collection(db, 'artifacts', appId, 'users', user.uid, 'asset_records');
     const q = query(recordsRef);
 
@@ -374,10 +388,44 @@ export default function App() {
     }
   };
 
+  // ★★★ 如果還在載入，顯示載入畫面 ★★★
   if (loading) {
     return <div className="flex items-center justify-center h-screen bg-slate-50 text-slate-500">
-      載入資產數據中... (若卡住請檢查 Firebase 設定)
+      載入中...
     </div>;
+  }
+
+  // ★★★ 如果沒有登入，顯示登入畫面 ★★★
+  if (!user) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 p-4">
+        <div className="bg-white p-8 rounded-2xl shadow-lg border border-slate-100 max-w-sm w-full text-center space-y-6">
+          <div className="bg-emerald-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto">
+            <TrendingUp className="w-8 h-8 text-emerald-600" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">資產成長追蹤</h1>
+            <p className="text-slate-500 mt-2">請登入以開始記錄您的財富</p>
+          </div>
+          <button 
+            onClick={handleGoogleLogin}
+            className="w-full bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium py-3 rounded-xl transition-all flex items-center justify-center gap-3 shadow-sm"
+          >
+            {/* Google Logo */}
+            <svg className="w-5 h-5" viewBox="0 0 24 24">
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+            </svg>
+            使用 Google 帳號登入
+          </button>
+          <p className="text-xs text-slate-400">
+            登入後資料將自動同步至雲端，換手機也不怕遺失。
+          </p>
+        </div>
+      </div>
+    );
   }
 
   const activePieData = allocationView === 'category' ? pieDataCategory : pieDataBank;
@@ -416,16 +464,38 @@ export default function App() {
             </h1>
             <p className="text-slate-500 mt-1">長期記錄您的財富累積 (銀行 + 股票)</p>
           </div>
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-col sm:flex-row gap-3 items-center">
+            {/* 顯示使用者資訊與登出按鈕 */}
+            <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200 mr-auto sm:mr-0 w-full sm:w-auto justify-between sm:justify-start">
+              <div className="flex items-center gap-2">
+                {user.photoURL ? (
+                  <img src={user.photoURL} alt="User" className="w-8 h-8 rounded-full" />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
+                    {user.email?.[0]?.toUpperCase() || 'U'}
+                  </div>
+                )}
+                <span className="text-sm font-medium text-slate-700 max-w-[100px] truncate">{user.displayName || user.email}</span>
+              </div>
+              <button 
+                onClick={handleLogout}
+                className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-red-500 transition-colors"
+                title="登出"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
+            </div>
+
              <button
               onClick={handleAiAnalysis}
               disabled={isAnalyzing || aggregatedChartData.length === 0}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-xl shadow-sm border border-transparent flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-xl shadow-sm border border-transparent flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed hidden md:flex"
             >
               {isAnalyzing ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <BrainCircuit className="w-5 h-5" />}
               {isAnalyzing ? '分析中...' : 'AI 資產分析'}
             </button>
-            <div className="bg-white px-6 py-3 rounded-xl shadow-sm border border-slate-200 flex items-center gap-3">
+            
+            <div className="bg-white px-6 py-3 rounded-xl shadow-sm border border-slate-200 flex items-center gap-3 w-full sm:w-auto">
               <div className="p-2 bg-emerald-100 rounded-full">
                 <Wallet className="w-6 h-6 text-emerald-600" />
               </div>
@@ -435,6 +505,15 @@ export default function App() {
               </div>
             </div>
           </div>
+           {/* Mobile AI Button */}
+           <button
+              onClick={handleAiAnalysis}
+              disabled={isAnalyzing || aggregatedChartData.length === 0}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-xl shadow-sm border border-transparent flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed md:hidden w-full"
+            >
+              {isAnalyzing ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <BrainCircuit className="w-5 h-5" />}
+              {isAnalyzing ? '分析中...' : 'AI 資產分析'}
+            </button>
         </header>
 
         {aiAnalysis && (
