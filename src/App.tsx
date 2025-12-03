@@ -3,7 +3,7 @@ import {
   ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
 import { 
-  Wallet, TrendingUp, Landmark, History, Plus, Trash2, Save, Briefcase, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Tag, BadgePercent, LogOut, UserCircle
+  Wallet, TrendingUp, Landmark, History, Plus, Trash2, Save, Briefcase, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Tag, BadgePercent, LogOut, UserCircle, BrainCircuit
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -114,6 +114,8 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
   const [allocationView, setAllocationView] = useState<'category' | 'bank'>('category');
+  const [aiAnalysis, setAiAnalysis] = useState<string>("");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [inputDate, setInputDate] = useState(new Date().toISOString().slice(0, 10));
   const [inputBankName, setInputBankName] = useState(''); 
   const [inputBank, setInputBank] = useState('');
@@ -338,10 +340,24 @@ export default function App() {
     }
   };
 
+  // AI 分析 - 暫時移除 UI，但保留函數以防未來需要
+  const handleAiAnalysis = async () => {
+    // 功能保留，介面已移除
+  };
+
+  // ★★★ 這裡就是設定載入背景圖片的地方 ★★★
   if (loading) {
-    return <div className="flex items-center justify-center h-screen bg-slate-50 text-slate-500">
-      載入中...
-    </div>;
+    return (
+      <div 
+        className="fixed inset-0 z-50 bg-cover bg-center bg-no-repeat bg-white"
+        style={{ 
+          // 請確認 public 資料夾有名為 loading.jpg (或 loading.png) 的圖片
+          backgroundImage: "url('/loading.jpg')" 
+        }}
+      >
+        {/* 如果你希望圖片載入前背景不是白色，可以修改上面的 bg-white */}
+      </div>
+    );
   }
 
   // ★★★ 如果沒有登入，顯示登入畫面 ★★★
